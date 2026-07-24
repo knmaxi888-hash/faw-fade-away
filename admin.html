@@ -583,7 +583,7 @@
             </div>
         </div>
 
-        <div class="earnings-grid">
+            <div class="earnings-grid">
             <div class="earnings-card">
                 <div class="earnings-label">Ingreso Total</div>
                 <div class="earnings-value" id="totalEarnings">$0</div>
@@ -592,12 +592,12 @@
             <div class="earnings-card">
                 <div class="earnings-label">Ganancia Barbero</div>
                 <div class="earnings-value" id="barberEarnings">$0</div>
-                <div class="earnings-sub" id="barberPercentage">70% del total</div>
+                <div class="earnings-sub" id="barberLeaveInfo">$1000 por corte</div>
             </div>
             <div class="earnings-card">
                 <div class="earnings-label">Ganancia Negocio</div>
                 <div class="earnings-value" id="businessEarnings">$0</div>
-                <div class="earnings-sub">30% del total</div>
+                <div class="earnings-sub">lo que deja el barbero</div>
             </div>
         </div>
 
@@ -637,8 +637,8 @@
                     <input type="number" id="cutPrice" placeholder="Ej: 5000">
                 </div>
                 <div class="config-item">
-                    <label>Porcentaje barbero (%)</label>
-                    <input type="number" id="barberPercent" placeholder="Ej: 70" max="100">
+                    <label>Lo que deja el barbero por corte</label>
+                    <input type="number" id="barberLeave" placeholder="Ej: 1000">
                 </div>
             </div>
             <button class="save-btn" id="saveConfig">Guardar Configuracion</button>
@@ -646,7 +646,7 @@
     </div>
 
     <script>
-        let config = JSON.parse(localStorage.getItem("faw_config") || '{"cutPrice": 5000, "barberPercent": 70}');
+        let config = JSON.parse(localStorage.getItem("faw_config") || '{"cutPrice": 5000, "barberLeave": 1000}');
         let currentFilter = "all";
 
         function getConfig() {
@@ -655,7 +655,7 @@
 
         function saveConfig() {
             config.cutPrice = parseInt(document.getElementById("cutPrice").value) || 5000;
-            config.barberPercent = parseInt(document.getElementById("barberPercent").value) || 70;
+            config.barberLeave = parseInt(document.getElementById("barberLeave").value) || 1000;
             localStorage.setItem("faw_config", JSON.stringify(config));
             loadStats();
             alert("Configuracion guardada");
@@ -717,16 +717,16 @@
 
             const monthRes = reservations.filter(r => isThisMonth(r.date) && r.status !== "cancelada");
             const totalEarnings = monthRes.length * cfg.cutPrice;
-            const barberEarnings = Math.round(totalEarnings * (cfg.barberPercent / 100));
-            const businessEarnings = totalEarnings - barberEarnings;
+            const businessEarnings = monthRes.length * cfg.barberLeave;
+            const barberEarnings = totalEarnings - businessEarnings;
 
             document.getElementById("totalEarnings").textContent = "$" + totalEarnings.toLocaleString();
             document.getElementById("barberEarnings").textContent = "$" + barberEarnings.toLocaleString();
             document.getElementById("businessEarnings").textContent = "$" + businessEarnings.toLocaleString();
-            document.getElementById("barberPercentage").textContent = cfg.barberPercent + "% del total";
+            document.getElementById("barberLeaveInfo").textContent = "$" + cfg.barberLeave.toLocaleString() + " por corte";
 
             document.getElementById("cutPrice").value = cfg.cutPrice;
-            document.getElementById("barberPercent").value = cfg.barberPercent;
+            document.getElementById("barberLeave").value = cfg.barberLeave;
 
             loadChart(reservations);
         }
