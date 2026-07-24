@@ -11,6 +11,11 @@
             box-sizing: border-box;
         }
 
+        html, body {
+            overflow-x: hidden;
+            width: 100%;
+        }
+
         body {
             background-color: #0a0a0a;
             font-family: Arial, Helvetica, sans-serif;
@@ -524,6 +529,7 @@
 
             .container {
                 padding: 15px;
+                overflow-x: hidden;
             }
 
             .stats-grid {
@@ -540,31 +546,35 @@
             }
 
             .chart-section {
-                padding: 20px 15px;
+                padding: 20px 10px;
                 overflow: hidden;
+                width: 100%;
             }
 
             .bar-chart {
-                height: 140px;
-                gap: 4px;
+                height: 120px;
+                gap: 2px;
                 padding: 0;
                 overflow: hidden;
+                width: 100%;
             }
 
             .bar-day {
-                gap: 4px;
+                gap: 3px;
+                min-width: 0;
             }
 
             .bar {
-                max-width: 28px;
+                max-width: 20px;
+                min-width: 12px;
             }
 
             .bar-value {
-                font-size: 9px;
+                font-size: 8px;
             }
 
             .bar-label {
-                font-size: 9px;
+                font-size: 8px;
             }
 
             .config-grid {
@@ -573,6 +583,60 @@
 
             .filter-tabs {
                 flex-wrap: wrap;
+            }
+
+            .filter-tab {
+                padding: 6px 12px;
+                font-size: 10px;
+            }
+
+            .table-header,
+            .table-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                padding: 12px 15px;
+            }
+
+            .table-header > div:nth-child(4),
+            .table-header > div:nth-child(5),
+            .table-header > div:nth-child(6),
+            .table-header > div:nth-child(7),
+            .table-row > div:nth-child(4),
+            .table-row > div:nth-child(5),
+            .table-row > div:nth-child(6),
+            .table-row > div:nth-child(7) {
+                display: none;
+            }
+
+            .table-row .name {
+                font-size: 13px;
+            }
+
+            .table-row .date,
+            .table-row .time {
+                font-size: 12px;
+            }
+
+            .actions {
+                flex-wrap: wrap;
+            }
+
+            .action-btn {
+                width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+
+            .earnings-grid {
+                gap: 10px;
+            }
+
+            .earnings-card {
+                padding: 20px;
+            }
+
+            .earnings-card .earnings-value {
+                font-size: 22px;
             }
         }
     </style>
