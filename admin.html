@@ -1086,17 +1086,11 @@
             if (user === ADMIN_USER && pass === ADMIN_PASS) {
                 document.getElementById("loginOverlay").style.display = "none";
                 document.getElementById("adminPanel").classList.add("active");
-                localStorage.setItem("faw_admin_session", "true");
             } else {
                 error.style.display = "block";
                 document.getElementById("password").value = "";
             }
         });
-
-        if (localStorage.getItem("faw_admin_session") === "true") {
-            document.getElementById("loginOverlay").style.display = "none";
-            document.getElementById("adminPanel").classList.add("active");
-        }
     </script>
 </body>
 </html>
