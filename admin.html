@@ -23,6 +23,113 @@
             min-height: 100vh;
         }
 
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 380px;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: linear-gradient(135deg, #141414 0%, #1a1a1a 100%);
+            border: 1px solid #222;
+            border-radius: 20px;
+            padding: 40px 35px;
+            text-align: center;
+        }
+
+        .login-logo {
+            font-size: 42px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            font-size: 13px;
+            color: #555;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .login-input {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 16px 18px;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            font-family: Arial, sans-serif;
+        }
+
+        .login-input:focus {
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+        }
+
+        .login-input::placeholder {
+            color: #444;
+        }
+
+        .login-btn {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 16px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            text-transform: uppercase;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15);
+        }
+
+        .login-btn:active {
+            transform: scale(0.98);
+        }
+
+        .login-error {
+            color: #F44336;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .admin-panel {
+            display: none;
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
         .header {
             background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
             padding: 30px 40px;
@@ -642,6 +749,22 @@
     </style>
 </head>
 <body>
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-logo">FAW</div>
+                <div class="login-subtitle">PANEL ADMIN</div>
+                <form class="login-form" id="loginForm">
+                    <input type="text" class="login-input" id="username" placeholder="Usuario" autocomplete="off">
+                    <input type="password" class="login-input" id="password" placeholder="Contrasena">
+                    <div class="login-error" id="loginError">Usuario o contrasena incorrectos</div>
+                    <button type="submit" class="login-btn">INGRESAR</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-panel" id="adminPanel">
     <div class="header">
         <h1>PANEL ADMIN</h1>
         <div class="barber-info">
@@ -733,6 +856,7 @@
             </div>
             <button class="save-btn" id="saveConfig">Guardar Configuracion</button>
         </div>
+    </div>
     </div>
 
     <script>
@@ -949,6 +1073,30 @@
 
         loadStats();
         loadReservations();
+
+        const ADMIN_USER = "gurty.faw";
+        const ADMIN_PASS = "180202";
+
+        document.getElementById("loginForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const user = document.getElementById("username").value.trim();
+            const pass = document.getElementById("password").value;
+            const error = document.getElementById("loginError");
+
+            if (user === ADMIN_USER && pass === ADMIN_PASS) {
+                document.getElementById("loginOverlay").style.display = "none";
+                document.getElementById("adminPanel").classList.add("active");
+                localStorage.setItem("faw_admin_session", "true");
+            } else {
+                error.style.display = "block";
+                document.getElementById("password").value = "";
+            }
+        });
+
+        if (localStorage.getItem("faw_admin_session") === "true") {
+            document.getElementById("loginOverlay").style.display = "none";
+            document.getElementById("adminPanel").classList.add("active");
+        }
     </script>
 </body>
 </html>
