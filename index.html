@@ -634,6 +634,30 @@
             color: #888;
         }
 
+        .admin-container {
+            margin-bottom: 15px;
+        }
+
+        .admin-btn {
+            background: none;
+            border: 1px solid #333;
+            color: #555;
+            padding: 8px 20px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            text-transform: uppercase;
+            font-family: Arial, sans-serif;
+        }
+
+        .admin-btn:hover {
+            color: #fff;
+            border-color: #666;
+        }
+
         .credit .verified {
             color: #1DA1F2;
             margin-left: 5px;
@@ -787,6 +811,10 @@
             </a>
         </div>
 
+        <div class="admin-container">
+            <a href="admin.html" class="admin-btn" target="_blank">Admin</a>
+        </div>
+
         <a href="https://www.instagram.com/wahr.ar/" class="credit" target="_blank" rel="noopener noreferrer">creado por wahr.ar <span class="verified">✔</span></a>
     </section>
 
@@ -894,11 +922,27 @@
             if (!this.classList.contains("enabled")) return;
 
             const name = document.getElementById("name").value.trim();
+            const whatsapp = document.getElementById("whatsapp").value.trim();
 
             const day = selectedDate.getDate().toString().padStart(2, "0");
             const month = (selectedDate.getMonth() + 1).toString().padStart(2, "0");
             const year = selectedDate.getFullYear();
             const dateFormatted = `${day}/${month}/${year}`;
+
+            const reservation = {
+                id: Date.now(),
+                name: name,
+                whatsapp: whatsapp,
+                date: dateFormatted,
+                time: selectedTime,
+                status: "pendiente",
+                payment: "pendiente",
+                createdAt: new Date().toISOString()
+            };
+
+            let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
+            reservations.push(reservation);
+            localStorage.setItem("faw_reservations", JSON.stringify(reservations));
 
             const message = `Hola, quiero reservar un turno.
 
