@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reserva - FAW</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, Helvetica, sans-serif;
+            padding: 40px 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 500px;
+            width: 100%;
+            animation: fadeIn 0.6s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .title {
+            font-size: 36px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: #888;
+            letter-spacing: 1px;
+            margin-bottom: 50px;
+        }
+
+        .form {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: #666;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .input-group input,
+        .input-group select {
+            background-color: #111;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 16px 20px;
+            font-size: 16px;
+            color: #fff;
+            outline: none;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            font-family: Arial, sans-serif;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+
+        .input-group input::placeholder {
+            color: #555;
+        }
+
+        .input-group select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+
+        .input-group select option {
+            background-color: #111;
+            color: #fff;
+        }
+
+        .input-group select option:disabled {
+            color: #444;
+        }
+
+        .calendar {
+            background-color: #111;
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-header button {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 8px;
+            transition: background-color 0.2s ease;
+        }
+
+        .calendar-header button:hover {
+            background-color: #222;
+        }
+
+        .calendar-header span {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            text-align: center;
+        }
+
+        .calendar-days .day-name {
+            font-size: 11px;
+            color: #555;
+            padding: 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .calendar-days .day {
+            padding: 10px 5px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .calendar-days .day:hover:not(.disabled):not(.empty) {
+            background-color: #222;
+        }
+
+        .calendar-days .day.selected {
+            background-color: #fff;
+            color: #000;
+            font-weight: 600;
+        }
+
+        .calendar-days .day.disabled {
+            color: #333;
+            cursor: not-allowed;
+        }
+
+        .calendar-days .day.empty {
+            cursor: default;
+        }
+
+        .time-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .time-section h3 {
+            font-size: 12px;
+            color: #666;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .time-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .time-btn {
+            background-color: #111;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-size: 14px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .time-btn:hover:not(.selected) {
+            border-color: #666;
+            background-color: #1a1a1a;
+        }
+
+        .time-btn.selected {
+            background-color: #fff;
+            color: #000;
+            border-color: #fff;
+            font-weight: 600;
+        }
+
+        .submit-btn {
+            margin-top: 20px;
+            width: 100%;
+            background-color: #fff;
+            color: #000;
+            border: none;
+            padding: 18px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.3s ease;
+            text-transform: uppercase;
+            font-family: Arial, sans-serif;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .submit-btn.enabled {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .submit-btn.enabled:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.25);
+        }
+
+        .submit-btn.enabled:active {
+            transform: scale(0.97);
+        }
+
+        .back-link {
+            margin-top: 30px;
+            color: #555;
+            text-decoration: none;
+            font-size: 14px;
+            letter-spacing: 1px;
+            transition: color 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">RESERVAR TURNO</h1>
+        <p class="subtitle">Elegí el día y horario de tu próxima visita.</p>
+
+        <form class="form" id="reservationForm">
+            <div class="input-group">
+                <label for="name">Nombre y Apellido</label>
+                <input type="text" id="name" placeholder="Tu nombre completo" required>
+            </div>
+
+            <div class="input-group">
+                <label for="whatsapp">Número de WhatsApp</label>
+                <input type="tel" id="whatsapp" placeholder="Ej: 549XXXXXXXXXX" required>
+            </div>
+
+            <div class="input-group">
+                <label>Seleccionar fecha</label>
+                <div class="calendar">
+                    <div class="calendar-header">
+                        <button type="button" id="prevMonth">‹</button>
+                        <span id="currentMonth"></span>
+                        <button type="button" id="nextMonth">›</button>
+                    </div>
+                    <div class="calendar-days" id="calendarDays"></div>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Seleccionar horario</label>
+                <div class="time-slots">
+                    <div class="time-section">
+                        <h3>Turno Mañana</h3>
+                        <div class="time-options">
+                            <button type="button" class="time-btn" data-time="08:00">08:00</button>
+                            <button type="button" class="time-btn" data-time="09:00">09:00</button>
+                            <button type="button" class="time-btn" data-time="10:00">10:00</button>
+                            <button type="button" class="time-btn" data-time="11:00">11:00</button>
+                            <button type="button" class="time-btn" data-time="12:00">12:00</button>
+                        </div>
+                    </div>
+                    <div class="time-section">
+                        <h3>Turno Tarde</h3>
+                        <div class="time-options">
+                            <button type="button" class="time-btn" data-time="16:00">16:00</button>
+                            <button type="button" class="time-btn" data-time="17:00">17:00</button>
+                            <button type="button" class="time-btn" data-time="18:00">18:00</button>
+                            <button type="button" class="time-btn" data-time="19:00">19:00</button>
+                            <button type="button" class="time-btn" data-time="20:00">20:00</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="submit-btn" id="submitBtn">RESERVAR POR WHATSAPP</button>
+        </form>
+
+        <a href="index.html" class="back-link">← Volver al inicio</a>
+    </div>
+
+    <script>
+        const WHATSAPP_NUMBER = "549XXXXXXXXXX";
+
+        let currentDate = new Date();
+        let selectedDate = null;
+        let selectedTime = null;
+
+        const monthNames = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+
+        const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            document.getElementById("currentMonth").textContent = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+
+            let startDay = firstDay.getDay() - 1;
+            if (startDay < 0) startDay = 6;
+
+            const totalDays = lastDay.getDate();
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let html = dayNames.map(day => `<div class="day-name">${day}</div>`).join("");
+
+            for (let i = 0; i < startDay; i++) {
+                html += '<div class="day empty"></div>';
+            }
+
+            for (let day = 1; day <= totalDays; day++) {
+                const date = new Date(year, month, day);
+                const dayOfWeek = date.getDay();
+                const isPast = date < today;
+                const isSunday = dayOfWeek === 0;
+                const isSelected = selectedDate &&
+                    selectedDate.getDate() === day &&
+                    selectedDate.getMonth() === month &&
+                    selectedDate.getFullYear() === year;
+
+                let classes = "day";
+                if (isPast || isSunday) classes += " disabled";
+                if (isSelected) classes += " selected";
+
+                html += `<div class="${classes}" data-day="${day}">${day}</div>`;
+            }
+
+            document.getElementById("calendarDays").innerHTML = html;
+
+            document.querySelectorAll(".calendar-days .day:not(.disabled):not(.empty)").forEach(el => {
+                el.addEventListener("click", function () {
+                    const day = parseInt(this.dataset.day);
+                    selectedDate = new Date(year, month, day);
+                    renderCalendar();
+                    validateForm();
+                });
+            });
+        }
+
+        document.getElementById("prevMonth").addEventListener("click", function () {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        });
+
+        document.getElementById("nextMonth").addEventListener("click", function () {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        });
+
+        document.querySelectorAll(".time-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                document.querySelectorAll(".time-btn").forEach(b => b.classList.remove("selected"));
+                this.classList.add("selected");
+                selectedTime = this.dataset.time;
+                validateForm();
+            });
+        });
+
+        function validateForm() {
+            const name = document.getElementById("name").value.trim();
+            const whatsapp = document.getElementById("whatsapp").value.trim();
+            const submitBtn = document.getElementById("submitBtn");
+
+            if (name && whatsapp && selectedDate && selectedTime) {
+                submitBtn.classList.add("enabled");
+            } else {
+                submitBtn.classList.remove("enabled");
+            }
+        }
+
+        document.getElementById("name").addEventListener("input", validateForm);
+        document.getElementById("whatsapp").addEventListener("input", validateForm);
+
+        document.getElementById("submitBtn").addEventListener("click", function () {
+            if (!this.classList.contains("enabled")) return;
+
+            const name = document.getElementById("name").value.trim();
+            const whatsapp = document.getElementById("whatsapp").value.trim();
+
+            const day = selectedDate.getDate().toString().padStart(2, "0");
+            const month = (selectedDate.getMonth() + 1).toString().padStart(2, "0");
+            const year = selectedDate.getFullYear();
+            const dateFormatted = `${day}/${month}/${year}`;
+
+            const message = `Hola, quiero reservar un turno.
+
+Nombre: ${name}
+
+Fecha: ${dateFormatted}
+
+Horario: ${selectedTime}`;
+
+            const encodedMessage = encodeURIComponent(message);
+            const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+
+            window.open(url, "_blank");
+        });
+
+        renderCalendar();
+    </script>
+</body>
+</html>
