@@ -876,11 +876,29 @@
         }
 
         function getReservations() {
-            return JSON.parse(localStorage.getItem("faw_reservations") || "[]");
+            try {
+                const data = localStorage.getItem("faw_reservations");
+                if (!data) return [];
+                const parsed = JSON.parse(data);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch(e) {
+                return [];
+            }
         }
 
         function saveReservations(reservations) {
             localStorage.setItem("faw_reservations", JSON.stringify(reservations));
+        }
+
+        let lastReservationCount = -1;
+
+        function checkForUpdates() {
+            const reservations = getReservations();
+            if (reservations.length !== lastReservationCount) {
+                lastReservationCount = reservations.length;
+                loadStats();
+                loadReservations();
+            }
         }
 
         function formatDate(dateStr) {
@@ -1076,18 +1094,22 @@
 
         loadStats();
         loadReservations();
+        lastReservationCount = getReservations().length;
 
         window.addEventListener("storage", function(e) {
             if (e.key === "faw_reservations") {
                 loadStats();
                 loadReservations();
+                lastReservationCount = getReservations().length;
             }
         });
 
-        setInterval(function() {
-            loadStats();
-            loadReservations();
-        }, 3000);
+        setInterval(checkForUpdates, 2000);
+
+        window.addEventListener("focus", function() {
+            lastReservationCount = -1;
+            checkForUpdates();
+        });
 
         const ADMIN_USER = "gusty.faw";
         const ADMIN_PASS = "180202";
@@ -1101,8 +1123,8 @@
             if (user === ADMIN_USER && pass === ADMIN_PASS) {
                 document.getElementById("loginOverlay").style.display = "none";
                 document.getElementById("adminPanel").classList.add("active");
-                loadStats();
-                loadReservations();
+                lastReservationCount = -1;
+                checkForUpdates();
             } else {
                 error.style.display = "block";
                 document.getElementById("password").value = "";
