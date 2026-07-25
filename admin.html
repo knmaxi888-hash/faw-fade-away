@@ -875,16 +875,19 @@
             alert("Configuracion guardada");
         }
 
+        const USE_SERVER = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
         function getReservations() {
-            return fetch("/api/reservations").then(r => r.json()).catch(() => []);
+            if (USE_SERVER) {
+                return fetch("/api/reservations").then(r => r.json()).catch(function() {
+                    return JSON.parse(localStorage.getItem("faw_reservations") || "[]");
+                });
+            }
+            return Promise.resolve(JSON.parse(localStorage.getItem("faw_reservations") || "[]"));
         }
 
-        function saveReservations(reservations) {
-            return fetch("/api/reservations", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(reservations)
-            }).catch(() => {});
+        function saveReservationsLocal(reservations) {
+            localStorage.setItem("faw_reservations", JSON.stringify(reservations));
         }
 
         let lastReservationCount = -1;
@@ -1055,35 +1058,67 @@
             if (status === "cancelada") {
                 if (!confirm("Marcar como cancelado? (No se presento)")) return;
             }
-            fetch("/api/reservations/" + id, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: status })
-            }).then(function() {
-                lastReservationCount = -1;
-                checkForUpdates();
-            });
+
+            if (USE_SERVER) {
+                fetch("/api/reservations/" + id, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: status })
+                }).then(function() {
+                    lastReservationCount = -1;
+                    checkForUpdates();
+                });
+            } else {
+                let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
+                const index = reservations.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    reservations[index].status = status;
+                    localStorage.setItem("faw_reservations", JSON.stringify(reservations));
+                    lastReservationCount = -1;
+                    checkForUpdates();
+                }
+            }
         }
 
         function updatePayment(id, payment) {
-            fetch("/api/reservations/" + id, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ payment: payment })
-            }).then(function() {
-                lastReservationCount = -1;
-                checkForUpdates();
-            });
+            if (USE_SERVER) {
+                fetch("/api/reservations/" + id, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ payment: payment })
+                }).then(function() {
+                    lastReservationCount = -1;
+                    checkForUpdates();
+                });
+            } else {
+                let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
+                const index = reservations.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    reservations[index].payment = payment;
+                    localStorage.setItem("faw_reservations", JSON.stringify(reservations));
+                    lastReservationCount = -1;
+                    checkForUpdates();
+                }
+            }
         }
 
         function deleteReservation(id) {
             if (!confirm("Eliminar esta reservacion?")) return;
-            fetch("/api/reservations/" + id, {
-                method: "DELETE"
-            }).then(function() {
+
+            if (USE_SERVER) {
+                fetch("/api/reservations/" + id, {
+                    method: "DELETE"
+                }).then(function() {
+                    lastReservationCount = -1;
+                    checkForUpdates();
+                });
+            } else {
+                let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
+                reservations = reservations.filter(r => r.id !== id);
+                localStorage.setItem("faw_reservations", JSON.stringify(reservations));
                 lastReservationCount = -1;
                 checkForUpdates();
-            });
+            }
         }
 
         document.querySelectorAll(".filter-tab").forEach(tab => {
