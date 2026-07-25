@@ -1016,10 +1016,10 @@
                             <button class="action-btn btn-cancel" onclick="updateStatus(${r.id}, 'cancelada')" title="Cancelar">✕</button>
                         ` : ''}
                         ${r.status === "confirmada" ? `
-                            <button class="action-btn btn-complete" onclick="updateStatus(${r.id}, 'completada')" title="Completar">●</button>
-                            <button class="action-btn btn-cancel" onclick="updateStatus(${r.id}, 'cancelada')" title="Cancelar">✕</button>
+                            <button class="action-btn btn-complete" onclick="updateStatus(${r.id}, 'completada')" title="Atendido">✓</button>
+                            <button class="action-btn btn-cancel" onclick="updateStatus(${r.id}, 'cancelada')" title="No se presento">✕</button>
                         ` : ''}
-                        ${r.payment === "pendiente" ? `
+                        ${r.payment === "pendiente" && r.status !== "cancelada" ? `
                             <button class="action-btn btn-cash" onclick="updatePayment(${r.id}, 'efectivo')" title="Efectivo">$</button>
                             <button class="action-btn btn-mp" onclick="updatePayment(${r.id}, 'mp')" title="Mercado Pago">M</button>
                         ` : ''}
@@ -1030,6 +1030,9 @@
         }
 
         function updateStatus(id, status) {
+            if (status === "cancelada") {
+                if (!confirm("Marcar como cancelado? (No se presento)")) return;
+            }
             const reservations = getReservations();
             const index = reservations.findIndex(r => r.id === id);
             if (index !== -1) {
