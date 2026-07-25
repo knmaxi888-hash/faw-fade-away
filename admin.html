@@ -875,11 +875,12 @@
             alert("Configuracion guardada");
         }
 
-        const USE_SERVER = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const USE_SERVER = true;
 
         function getReservations() {
             if (USE_SERVER) {
-                return fetch("/api/reservations").then(r => r.json()).catch(function() {
+                return fetch("/api/reservations").then(function(r) { return r.json(); }).catch(function() {
                     return JSON.parse(localStorage.getItem("faw_reservations") || "[]");
                 });
             }
