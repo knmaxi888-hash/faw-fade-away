@@ -929,33 +929,29 @@
             const year = selectedDate.getFullYear();
             const dateFormatted = `${day}/${month}/${year}`;
 
-            const reservation = {
-                id: Date.now(),
-                name: name,
-                apellido: apellido,
-                date: dateFormatted,
-                time: selectedTime,
-                status: "pendiente",
-                payment: "pendiente",
-                createdAt: new Date().toISOString()
-            };
+            fetch("/api/reservations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: name,
+                    apellido: apellido,
+                    date: dateFormatted,
+                    time: selectedTime
+                })
+            }).then(function() {
+                const message = `Hola, quiero reservar un turno.
 
-            let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
-            reservations.push(reservation);
-            localStorage.setItem("faw_reservations", JSON.stringify(reservations));
+    Nombre: ${name} ${apellido}
 
-            const message = `Hola, quiero reservar un turno.
+    Fecha: ${dateFormatted}
 
-Nombre: ${name} ${apellido}
+    Horario: ${selectedTime}`;
 
-Fecha: ${dateFormatted}
+                const encodedMessage = encodeURIComponent(message);
+                const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
 
-Horario: ${selectedTime}`;
-
-            const encodedMessage = encodeURIComponent(message);
-            const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
-
-            window.open(url, "_blank");
+                window.open(url, "_blank");
+            });
         });
 
         renderCalendar();

@@ -1,0 +1,23 @@
+{
+  "name": "faw.claud",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knmaxi888-hash/faw-fade-away.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/knmaxi888-hash/faw-fade-away/issues"
+  },
+  "homepage": "https://github.com/knmaxi888-hash/faw-fade-away#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

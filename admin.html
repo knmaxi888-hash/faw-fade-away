@@ -876,29 +876,27 @@
         }
 
         function getReservations() {
-            try {
-                const data = localStorage.getItem("faw_reservations");
-                if (!data) return [];
-                const parsed = JSON.parse(data);
-                return Array.isArray(parsed) ? parsed : [];
-            } catch(e) {
-                return [];
-            }
+            return fetch("/api/reservations").then(r => r.json()).catch(() => []);
         }
 
         function saveReservations(reservations) {
-            localStorage.setItem("faw_reservations", JSON.stringify(reservations));
+            return fetch("/api/reservations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(reservations)
+            }).catch(() => {});
         }
 
         let lastReservationCount = -1;
 
         function checkForUpdates() {
-            const reservations = getReservations();
-            if (reservations.length !== lastReservationCount) {
-                lastReservationCount = reservations.length;
-                loadStats();
-                loadReservations();
-            }
+            getReservations().then(function(reservations) {
+                if (reservations.length !== lastReservationCount) {
+                    lastReservationCount = reservations.length;
+                    loadStats(reservations);
+                    loadReservations(reservations);
+                }
+            });
         }
 
         function formatDate(dateStr) {
@@ -933,8 +931,11 @@
                    d.getFullYear() === today.getFullYear();
         }
 
-        function loadStats() {
-            const reservations = getReservations();
+        function loadStats(reservations) {
+            if (!reservations) {
+                getReservations().then(function(data) { loadStats(data); loadReservations(data); });
+                return;
+            }
             const cfg = getConfig();
 
             const todayRes = reservations.filter(r => isToday(r.date));
@@ -1001,8 +1002,11 @@
             });
         }
 
-        function loadReservations() {
-            const reservations = getReservations();
+        function loadReservations(reservations) {
+            if (!reservations) {
+                getReservations().then(function(data) { loadReservations(data); });
+                return;
+            }
             const list = document.getElementById("reservationsList");
             const filtered = currentFilter === "all" 
                 ? reservations 
@@ -1051,34 +1055,35 @@
             if (status === "cancelada") {
                 if (!confirm("Marcar como cancelado? (No se presento)")) return;
             }
-            const reservations = getReservations();
-            const index = reservations.findIndex(r => r.id === id);
-            if (index !== -1) {
-                reservations[index].status = status;
-                saveReservations(reservations);
-                loadStats();
-                loadReservations();
-            }
+            fetch("/api/reservations/" + id, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: status })
+            }).then(function() {
+                lastReservationCount = -1;
+                checkForUpdates();
+            });
         }
 
         function updatePayment(id, payment) {
-            const reservations = getReservations();
-            const index = reservations.findIndex(r => r.id === id);
-            if (index !== -1) {
-                reservations[index].payment = payment;
-                saveReservations(reservations);
-                loadStats();
-                loadReservations();
-            }
+            fetch("/api/reservations/" + id, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ payment: payment })
+            }).then(function() {
+                lastReservationCount = -1;
+                checkForUpdates();
+            });
         }
 
         function deleteReservation(id) {
             if (!confirm("Eliminar esta reservacion?")) return;
-            let reservations = getReservations();
-            reservations = reservations.filter(r => r.id !== id);
-            saveReservations(reservations);
-            loadStats();
-            loadReservations();
+            fetch("/api/reservations/" + id, {
+                method: "DELETE"
+            }).then(function() {
+                lastReservationCount = -1;
+                checkForUpdates();
+            });
         }
 
         document.querySelectorAll(".filter-tab").forEach(tab => {
@@ -1093,14 +1098,14 @@
         document.getElementById("saveConfig").addEventListener("click", saveConfig);
 
         loadStats();
-        loadReservations();
-        lastReservationCount = getReservations().length;
+        getReservations().then(function(data) {
+            lastReservationCount = data.length;
+        });
 
         window.addEventListener("storage", function(e) {
             if (e.key === "faw_reservations") {
-                loadStats();
-                loadReservations();
-                lastReservationCount = getReservations().length;
+                lastReservationCount = -1;
+                checkForUpdates();
             }
         });
 
