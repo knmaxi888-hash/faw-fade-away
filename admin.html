@@ -954,7 +954,9 @@
             document.getElementById("cancelledCount").textContent = cancelled.length;
 
             const monthRes = reservations.filter(r => isThisMonth(r.date) && r.status !== "cancelada");
-            const totalEarnings = monthRes.length * cfg.cutPrice;
+            const totalEarnings = monthRes.reduce(function(sum, r) {
+                return sum + (r.amount || cfg.cutPrice);
+            }, 0);
             const businessEarnings = monthRes.length * cfg.barberLeave;
             const barberEarnings = totalEarnings - businessEarnings;
 
@@ -1035,8 +1037,8 @@
                     <div class="date">${r.date}</div>
                     <div class="time">${r.time}</div>
                     <div><span class="status-badge status-${r.status}">${r.status}</span></div>
-                    <div><span class="payment-badge payment-${r.payment}">${r.payment}</span></div>
-                    <div class="date">$${getConfig().cutPrice.toLocaleString()}</div>
+                    <div><span class="payment-badge payment-${r.payment}">${r.payment}${r.amount ? ' $' + r.amount.toLocaleString() : ''}</span></div>
+                    <div class="date">${r.amount ? '$' + r.amount.toLocaleString() : '$' + getConfig().cutPrice.toLocaleString()}</div>
                     <div class="actions">
                         ${r.status === "pendiente" ? `
                             <button class="action-btn btn-confirm" onclick="updateStatus(${r.id}, 'confirmada')" title="Confirmar">✓</button>
@@ -1047,8 +1049,8 @@
                             <button class="action-btn btn-cancel" onclick="updateStatus(${r.id}, 'cancelada')" title="No se presento">✕</button>
                         ` : ''}
                         ${r.payment === "pendiente" && r.status !== "cancelada" ? `
-                            <button class="action-btn btn-cash" onclick="updatePayment(${r.id}, 'efectivo')" title="Efectivo">$</button>
-                            <button class="action-btn btn-mp" onclick="updatePayment(${r.id}, 'mp')" title="Mercado Pago">M</button>
+                            <button class="action-btn btn-cash" onclick="askAmount(${r.id}, 'efectivo')" title="Efectivo">$</button>
+                            <button class="action-btn btn-mp" onclick="askAmount(${r.id}, 'mp')" title="Mercado Pago">M</button>
                         ` : ''}
                         <button class="action-btn btn-delete" onclick="deleteReservation(${r.id})" title="Eliminar">🗑</button>
                     </div>
@@ -1082,12 +1084,25 @@
             }
         }
 
-        function updatePayment(id, payment) {
+        function askAmount(id, payment) {
+            const method = payment === "efectivo" ? "Efectivo" : "Mercado Pago";
+            const defaultAmount = getConfig().cutPrice;
+            const input = prompt("Monto del pago (" + method + "):", defaultAmount);
+            if (input === null) return;
+            const amount = parseInt(input);
+            if (isNaN(amount) || amount <= 0) {
+                alert("Monto invalido");
+                return;
+            }
+            updatePayment(id, payment, amount);
+        }
+
+        function updatePayment(id, payment, amount) {
             if (USE_SERVER) {
                 fetch("/api/reservations/" + id, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ payment: payment })
+                    body: JSON.stringify({ payment: payment, amount: amount })
                 }).then(function() {
                     lastReservationCount = -1;
                     checkForUpdates();
@@ -1097,6 +1112,7 @@
                 const index = reservations.findIndex(r => r.id === id);
                 if (index !== -1) {
                     reservations[index].payment = payment;
+                    if (amount) reservations[index].amount = amount;
                     localStorage.setItem("faw_reservations", JSON.stringify(reservations));
                     lastReservationCount = -1;
                     checkForUpdates();
