@@ -1101,6 +1101,8 @@
             if (user === ADMIN_USER && pass === ADMIN_PASS) {
                 document.getElementById("loginOverlay").style.display = "none";
                 document.getElementById("adminPanel").classList.add("active");
+                loadStats();
+                loadReservations();
             } else {
                 error.style.display = "block";
                 document.getElementById("password").value = "";
