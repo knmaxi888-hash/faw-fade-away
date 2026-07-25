@@ -1077,6 +1077,18 @@
         loadStats();
         loadReservations();
 
+        window.addEventListener("storage", function(e) {
+            if (e.key === "faw_reservations") {
+                loadStats();
+                loadReservations();
+            }
+        });
+
+        setInterval(function() {
+            loadStats();
+            loadReservations();
+        }, 3000);
+
         const ADMIN_USER = "gusty.faw";
         const ADMIN_PASS = "180202";
 
