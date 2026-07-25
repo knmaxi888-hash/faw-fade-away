@@ -1004,7 +1004,7 @@
 
             list.innerHTML = filtered.map(r => `
                 <div class="table-row">
-                    <div class="name">${r.name}</div>
+                    <div class="name">${r.name} ${r.apellido || ''}</div>
                     <div class="date">${r.date}</div>
                     <div class="time">${r.time}</div>
                     <div><span class="status-badge status-${r.status}">${r.status}</span></div>

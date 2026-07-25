@@ -685,13 +685,13 @@
 
             <form class="form" id="reservationForm">
                 <div class="input-group">
-                    <label for="name">Nombre y Apellido</label>
-                    <input type="text" id="name" placeholder="Tu nombre completo" required>
+                    <label for="name">Nombre</label>
+                    <input type="text" id="name" placeholder="Tu nombre" required>
                 </div>
 
                 <div class="input-group">
-                    <label for="whatsapp">Número de WhatsApp</label>
-                    <input type="tel" id="whatsapp" placeholder="Ej: 549XXXXXXXXXX" required>
+                    <label for="apellido">Apellido</label>
+                    <input type="text" id="apellido" placeholder="Tu apellido" required>
                 </div>
 
                 <div class="input-group">
@@ -905,10 +905,10 @@
 
         function validateForm() {
             const name = document.getElementById("name").value.trim();
-            const whatsapp = document.getElementById("whatsapp").value.trim();
+            const apellido = document.getElementById("apellido").value.trim();
             const submitBtn = document.getElementById("submitBtn");
 
-            if (name && whatsapp && selectedDate && selectedTime) {
+            if (name && apellido && selectedDate && selectedTime) {
                 submitBtn.classList.add("enabled");
             } else {
                 submitBtn.classList.remove("enabled");
@@ -916,13 +916,13 @@
         }
 
         document.getElementById("name").addEventListener("input", validateForm);
-        document.getElementById("whatsapp").addEventListener("input", validateForm);
+        document.getElementById("apellido").addEventListener("input", validateForm);
 
         document.getElementById("submitBtn").addEventListener("click", function () {
             if (!this.classList.contains("enabled")) return;
 
             const name = document.getElementById("name").value.trim();
-            const whatsapp = document.getElementById("whatsapp").value.trim();
+            const apellido = document.getElementById("apellido").value.trim();
 
             const day = selectedDate.getDate().toString().padStart(2, "0");
             const month = (selectedDate.getMonth() + 1).toString().padStart(2, "0");
@@ -932,7 +932,7 @@
             const reservation = {
                 id: Date.now(),
                 name: name,
-                whatsapp: whatsapp,
+                apellido: apellido,
                 date: dateFormatted,
                 time: selectedTime,
                 status: "pendiente",
@@ -946,7 +946,7 @@
 
             const message = `Hola, quiero reservar un turno.
 
-Nombre: ${name}
+Nombre: ${name} ${apellido}
 
 Fecha: ${dateFormatted}
 
