@@ -876,7 +876,8 @@
         }
 
         const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const USE_SERVER = true;
+        const IS_RENDER = window.location.hostname === "faw-fade-away.onrender.com";
+        const USE_SERVER = IS_LOCAL || IS_RENDER;
 
         function getReservations() {
             if (USE_SERVER) {
