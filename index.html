@@ -271,6 +271,14 @@
             font-weight: 600;
         }
 
+        .time-btn:disabled {
+            background-color: #111;
+            color: #333;
+            border-color: #222;
+            cursor: not-allowed;
+            opacity: 0.3;
+        }
+
         .submit-btn {
             margin-top: 20px;
             width: 100%;
@@ -901,10 +909,42 @@
                 el.addEventListener("click", function () {
                     const day = parseInt(this.dataset.day);
                     selectedDate = new Date(year, month, day);
+                    selectedTime = null;
                     renderCalendar();
+                    loadReservedTimes();
                     validateForm();
                 });
             });
+        }
+
+        function loadReservedTimes() {
+            document.querySelectorAll(".time-btn").forEach(function(btn) {
+                btn.classList.remove("selected");
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+            });
+
+            if (!selectedDate) return;
+
+            const day = selectedDate.getDate().toString().padStart(2, "0");
+            const month = (selectedDate.getMonth() + 1).toString().padStart(2, "0");
+            const year = selectedDate.getFullYear();
+            const dateStr = `${day}/${month}/${year}`;
+
+            fetch("/api/reserved-times/" + encodeURIComponent(dateStr))
+                .then(function(r) { return r.json(); })
+                .then(function(reservedTimes) {
+                    document.querySelectorAll(".time-btn").forEach(function(btn) {
+                        if (reservedTimes.includes(btn.dataset.time)) {
+                            btn.disabled = true;
+                            btn.style.opacity = "0.3";
+                            btn.style.cursor = "not-allowed";
+                            btn.title = "Horario ya reservado";
+                        }
+                    });
+                })
+                .catch(function() {});
         }
 
         document.getElementById("prevMonth").addEventListener("click", function () {
@@ -919,6 +959,7 @@
 
         document.querySelectorAll(".time-btn").forEach(btn => {
             btn.addEventListener("click", function () {
+                if (this.disabled) return;
                 document.querySelectorAll(".time-btn").forEach(b => b.classList.remove("selected"));
                 this.classList.add("selected");
                 selectedTime = this.dataset.time;

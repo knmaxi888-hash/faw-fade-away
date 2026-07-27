@@ -30,6 +30,15 @@ app.get("/api/reservations", (req, res) => {
     res.json(readData());
 });
 
+app.get("/api/reserved-times/:date", (req, res) => {
+    const reservations = readData();
+    const date = req.params.date;
+    const reserved = reservations
+        .filter(r => r.date === date && r.status !== "cancelada")
+        .map(r => r.time);
+    res.json(reserved);
+});
+
 app.post("/api/reservations", (req, res) => {
     const reservations = readData();
     const newReservation = {
