@@ -851,6 +851,7 @@
 
     <script>
         const WHATSAPP_NUMBER = "5493718669138";
+        const API_URL = "https://faw-fade-away.onrender.com";
 
         let currentDate = new Date();
         let selectedDate = null;
@@ -932,7 +933,7 @@
             const year = selectedDate.getFullYear();
             const dateStr = `${day}/${month}/${year}`;
 
-            fetch("/api/reserved-times/" + encodeURIComponent(dateStr))
+            fetch(API_URL + "/api/reserved-times/" + encodeURIComponent(dateStr))
                 .then(function(r) { return r.json(); })
                 .then(function(reservedTimes) {
                     document.querySelectorAll(".time-btn").forEach(function(btn) {
@@ -1000,7 +1001,7 @@
                 time: selectedTime
             };
 
-            const saveToServer = fetch("/api/reservations", {
+            const saveToServer = fetch(API_URL + "/api/reservations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(reservation)
@@ -1019,7 +1020,13 @@
                 resolve(true);
             });
 
-            Promise.all([saveToServer, saveToLocal]).then(function() {
+            Promise.all([saveToServer, saveToLocal]).then(function(results) {
+                const serverOk = results[0];
+                if (!serverOk) {
+                    alert("No se pudo conectar con el servidor. La reserva no se guardó. Intente de nuevo.");
+                    return;
+                }
+
                 const message = `Hola, quiero reservar un turno.
 
     Nombre: ${name} ${apellido}
@@ -1032,6 +1039,13 @@
                 const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
 
                 window.open(url, "_blank");
+
+                loadReservedTimes();
+                selectedTime = null;
+                document.querySelectorAll(".time-btn").forEach(function(b) { b.classList.remove("selected"); });
+                document.getElementById("name").value = "";
+                document.getElementById("apellido").value = "";
+                document.getElementById("submitBtn").classList.remove("enabled");
             });
         });
 

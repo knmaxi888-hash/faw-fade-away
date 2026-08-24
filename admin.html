@@ -222,12 +222,11 @@
             background: #111;
             border: 1px solid #222;
             border-radius: 16px;
-            overflow: hidden;
         }
 
         .table-header {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 100px;
+            grid-template-columns: 2fr 1fr 1fr 1fr 160px;
             gap: 10px;
             padding: 15px 25px;
             background: #1a1a1a;
@@ -240,7 +239,7 @@
 
         .table-row {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 100px;
+            grid-template-columns: 2fr 1fr 1fr 1fr 160px;
             gap: 10px;
             padding: 18px 25px;
             border-bottom: 1px solid #1a1a1a;
@@ -608,25 +607,9 @@
             .earnings-grid {
                 grid-template-columns: 1fr;
             }
-
-            .table-header,
-            .table-row {
-                grid-template-columns: 1fr 1fr 1fr;
-            }
-
-            .table-header > div:nth-child(4),
-            .table-header > div:nth-child(5),
-            .table-header > div:nth-child(6),
-            .table-header > div:nth-child(7),
-            .table-row > div:nth-child(4),
-            .table-row > div:nth-child(5),
-            .table-row > div:nth-child(6),
-            .table-row > div:nth-child(7) {
-                display: none;
-            }
         }
 
-        @media (max-width: 600px) {
+        @media (max-width: 700px) {
             .header {
                 flex-direction: column;
                 gap: 15px;
@@ -636,7 +619,6 @@
 
             .container {
                 padding: 15px;
-                overflow-x: hidden;
             }
 
             .stats-grid {
@@ -654,7 +636,6 @@
 
             .chart-section {
                 padding: 20px 10px;
-                overflow: hidden;
                 width: 100%;
             }
 
@@ -662,7 +643,6 @@
                 height: 120px;
                 gap: 2px;
                 padding: 0;
-                overflow: hidden;
                 width: 100%;
             }
 
@@ -698,37 +678,49 @@
             }
 
             .table-header {
-                display: none;
+                display: none !important;
             }
 
             .table-row {
-                display: flex;
+                display: flex !important;
                 flex-direction: column;
                 gap: 8px;
                 padding: 15px;
                 border-bottom: 1px solid #222;
+                align-items: flex-start;
+            }
+
+            .table-row > div {
+                display: block !important;
+                width: 100%;
             }
 
             .table-row .name {
-                font-size: 14px;
+                font-size: 16px;
+                font-weight: 700;
             }
 
             .table-row .date,
             .table-row .time {
-                font-size: 12px;
+                font-size: 13px;
+                color: #888;
             }
 
             .actions {
-                display: flex;
-                gap: 8px;
+                display: flex !important;
+                gap: 10px;
                 flex-wrap: wrap;
-                margin-top: 5px;
+                margin-top: 8px;
+                width: 100%;
             }
 
             .action-btn {
-                width: 36px;
-                height: 36px;
-                font-size: 14px;
+                width: 44px;
+                height: 44px;
+                font-size: 18px;
+                display: flex !important;
+                align-items: center;
+                justify-content: center;
             }
 
             .earnings-grid {
@@ -831,8 +823,6 @@
                     <div>Fecha</div>
                     <div>Horario</div>
                     <div>Estado</div>
-                    <div>Pago</div>
-                    <div>Monto</div>
                     <div>Acciones</div>
                 </div>
                 <div id="reservationsList"></div>
@@ -857,6 +847,7 @@
     </div>
 
     <script>
+        const API_URL = "https://faw-fade-away.onrender.com";
         let config = JSON.parse(localStorage.getItem("faw_config") || '{"cutPrice": 5000, "barberLeave": 1000}');
         let currentFilter = "all";
 
@@ -872,29 +863,23 @@
             alert("Configuracion guardada");
         }
 
-        const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const IS_RENDER = window.location.hostname === "faw-fade-away.onrender.com";
-        const USE_SERVER = IS_LOCAL || IS_RENDER;
-
         function getReservations() {
-            if (USE_SERVER) {
-                return fetch("/api/reservations").then(function(r) { return r.json(); }).catch(function() {
-                    return JSON.parse(localStorage.getItem("faw_reservations") || "[]");
-                });
-            }
-            return Promise.resolve(JSON.parse(localStorage.getItem("faw_reservations") || "[]"));
+            return fetch(API_URL + "/api/reservations").then(function(r) { return r.json(); }).catch(function() {
+                return JSON.parse(localStorage.getItem("faw_reservations") || "[]");
+            });
         }
 
         function saveReservationsLocal(reservations) {
             localStorage.setItem("faw_reservations", JSON.stringify(reservations));
         }
 
-        let lastReservationCount = -1;
+        let lastReservationData = "";
 
         function checkForUpdates() {
             getReservations().then(function(reservations) {
-                if (reservations.length !== lastReservationCount) {
-                    lastReservationCount = reservations.length;
+                const dataStr = JSON.stringify(reservations);
+                if (dataStr !== lastReservationData) {
+                    lastReservationData = dataStr;
                     loadStats(reservations);
                     loadReservations(reservations);
                 }
@@ -977,23 +962,26 @@
             for (let i = 6; i >= 0; i--) {
                 const d = new Date(today);
                 d.setDate(today.getDate() - i);
-                const key = d.getDate() + "/" + (d.getMonth() + 1);
+                const key = d.getDate() + "/" + (d.getMonth() + 1) + "/" + d.getFullYear();
                 dayCounts[key] = 0;
             }
 
             reservations.forEach(r => {
-                if (dayCounts.hasOwnProperty(r.date)) {
-                    dayCounts[r.date]++;
+                const parts = r.date.split("/");
+                const shortKey = parseInt(parts[0]) + "/" + parseInt(parts[1]) + "/" + parts[2];
+                if (dayCounts.hasOwnProperty(shortKey)) {
+                    dayCounts[shortKey]++;
                 }
             });
 
             const maxCount = Math.max(...Object.values(dayCounts), 1);
 
             chart.innerHTML = "";
-            Object.keys(dayCounts).forEach((date, index) => {
+            Object.keys(dayCounts).forEach(function(date) {
                 const count = dayCounts[date];
                 const height = Math.max((count / maxCount) * 160, 4);
-                const d = formatDate(date);
+                const parts = date.split("/");
+                const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
                 const dayName = days[d.getDay()];
 
                 chart.innerHTML += `
@@ -1034,18 +1022,12 @@
                     <div class="date">${r.date}</div>
                     <div class="time">${r.time}</div>
                     <div><span class="status-badge status-${r.status}">${r.status}</span></div>
-                    <div><span class="payment-badge payment-${r.payment}">${r.payment}${r.amount ? ' $' + r.amount.toLocaleString() : ''}</span></div>
-                    <div class="date">${r.amount ? '$' + r.amount.toLocaleString() : '$' + getConfig().cutPrice.toLocaleString()}</div>
                     <div class="actions">
                         ${r.status === "pendiente" ? `
-                            <button class="action-btn btn-confirm" onclick="updateStatus(${r.id}, 'confirmada')" title="Confirmar">✓</button>
+                            <button class="action-btn btn-confirm" onclick="updateStatus(${r.id}, 'confirmada')" title="Aceptar">✓</button>
                             <button class="action-btn btn-cancel" onclick="updateStatus(${r.id}, 'cancelada')" title="Cancelar">✕</button>
                         ` : ''}
-                        ${r.status === "confirmada" ? `
-                            <button class="action-btn btn-complete" onclick="updateStatus(${r.id}, 'completada')" title="Atendido">✓</button>
-                            <button class="action-btn btn-cancel" onclick="updateStatus(${r.id}, 'cancelada')" title="No se presento">✕</button>
-                        ` : ''}
-                        ${r.payment === "pendiente" && r.status !== "cancelada" ? `
+                        ${r.status === "confirmada" && r.payment === "pendiente" ? `
                             <button class="action-btn btn-cash" onclick="askAmount(${r.id}, 'efectivo')" title="Efectivo">$</button>
                             <button class="action-btn btn-mp" onclick="askAmount(${r.id}, 'mp')" title="Mercado Pago">M</button>
                         ` : ''}
@@ -1060,25 +1042,23 @@
                 if (!confirm("Marcar como cancelado? (No se presento)")) return;
             }
 
-            if (USE_SERVER) {
-                fetch("/api/reservations/" + id, {
+fetch(API_URL + "/api/reservations/" + id, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ status: status })
-                }).then(function() {
-                    lastReservationCount = -1;
-                    checkForUpdates();
-                });
-            } else {
+            }).then(function() {
+                lastReservationData = "";
+                checkForUpdates();
+            }).catch(function() {
                 let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
                 const index = reservations.findIndex(r => r.id === id);
                 if (index !== -1) {
                     reservations[index].status = status;
                     localStorage.setItem("faw_reservations", JSON.stringify(reservations));
-                    lastReservationCount = -1;
+                    lastReservationData = "";
                     checkForUpdates();
                 }
-            }
+            });
         }
 
         function askAmount(id, payment) {
@@ -1095,45 +1075,41 @@
         }
 
         function updatePayment(id, payment, amount) {
-            if (USE_SERVER) {
-                fetch("/api/reservations/" + id, {
+fetch(API_URL + "/api/reservations/" + id, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ payment: payment, amount: amount })
-                }).then(function() {
-                    lastReservationCount = -1;
-                    checkForUpdates();
-                });
-            } else {
+            }).then(function() {
+                lastReservationData = "";
+                checkForUpdates();
+            }).catch(function() {
                 let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
                 const index = reservations.findIndex(r => r.id === id);
                 if (index !== -1) {
                     reservations[index].payment = payment;
                     if (amount) reservations[index].amount = amount;
                     localStorage.setItem("faw_reservations", JSON.stringify(reservations));
-                    lastReservationCount = -1;
+                    lastReservationData = "";
                     checkForUpdates();
                 }
-            }
+            });
         }
 
         function deleteReservation(id) {
             if (!confirm("Eliminar esta reservacion?")) return;
 
-            if (USE_SERVER) {
-                fetch("/api/reservations/" + id, {
+fetch(API_URL + "/api/reservations/" + id, {
                     method: "DELETE"
-                }).then(function() {
-                    lastReservationCount = -1;
-                    checkForUpdates();
-                });
-            } else {
+            }).then(function() {
+                lastReservationData = "";
+                checkForUpdates();
+            }).catch(function() {
                 let reservations = JSON.parse(localStorage.getItem("faw_reservations") || "[]");
                 reservations = reservations.filter(r => r.id !== id);
                 localStorage.setItem("faw_reservations", JSON.stringify(reservations));
-                lastReservationCount = -1;
+                lastReservationData = "";
                 checkForUpdates();
-            }
+            });
         }
 
         document.querySelectorAll(".filter-tab").forEach(tab => {
@@ -1149,12 +1125,12 @@
 
         loadStats();
         getReservations().then(function(data) {
-            lastReservationCount = data.length;
+            lastReservationData = JSON.stringify(data);
         });
 
         window.addEventListener("storage", function(e) {
             if (e.key === "faw_reservations") {
-                lastReservationCount = -1;
+                lastReservationData = "";
                 checkForUpdates();
             }
         });
@@ -1162,7 +1138,7 @@
         setInterval(checkForUpdates, 2000);
 
         window.addEventListener("focus", function() {
-            lastReservationCount = -1;
+            lastReservationData = "";
             checkForUpdates();
         });
 
@@ -1178,8 +1154,10 @@
             if (user === ADMIN_USER && pass === ADMIN_PASS) {
                 document.getElementById("loginOverlay").style.display = "none";
                 document.getElementById("adminPanel").classList.add("active");
-                lastReservationCount = -1;
-                checkForUpdates();
+                lastReservationData = "";
+                setTimeout(function() {
+                    checkForUpdates();
+                }, 500);
             } else {
                 error.style.display = "block";
                 document.getElementById("password").value = "";

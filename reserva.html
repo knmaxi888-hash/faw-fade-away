@@ -349,6 +349,7 @@
 
     <script>
         const WHATSAPP_NUMBER = "549XXXXXXXXXX";
+        const API_URL = "https://faw-fade-away.onrender.com";
 
         let currentDate = new Date();
         let selectedDate = null;
@@ -458,18 +459,32 @@
             const year = selectedDate.getFullYear();
             const dateFormatted = `${day}/${month}/${year}`;
 
-            const message = `Hola, quiero reservar un turno.
+            const reservation = {
+                name: name,
+                apellido: "",
+                date: dateFormatted,
+                time: selectedTime
+            };
 
-Nombre: ${name}
+            fetch(API_URL + "/api/reservations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(reservation)
+            }).then(function() {
+                const message = `Hola, quiero reservar un turno.
 
-Fecha: ${dateFormatted}
+    Nombre: ${name}
 
-Horario: ${selectedTime}`;
+    Fecha: ${dateFormatted}
 
-            const encodedMessage = encodeURIComponent(message);
-            const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+    Horario: ${selectedTime}`;
 
-            window.open(url, "_blank");
+                const encodedMessage = encodeURIComponent(message);
+                const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+                window.open(url, "_blank");
+            }).catch(function() {
+                alert("No se pudo conectar con el servidor. Intente de nuevo.");
+            });
         });
 
         renderCalendar();
