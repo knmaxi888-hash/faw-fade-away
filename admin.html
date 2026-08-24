@@ -225,9 +225,9 @@
         }
 
         .table-header {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 160px;
-            gap: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             padding: 15px 25px;
             background: #1a1a1a;
             border-bottom: 1px solid #222;
@@ -237,15 +237,40 @@
             letter-spacing: 1px;
         }
 
+        .table-header .header-info {
+            display: flex;
+            gap: 16px;
+            flex: 1;
+        }
+
         .table-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 160px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             gap: 10px;
             padding: 18px 25px;
             border-bottom: 1px solid #1a1a1a;
-            align-items: center;
             font-size: 14px;
             transition: background 0.2s ease;
+        }
+
+        .row-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .row-info .name {
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+        }
+
+        .row-info .date {
+            color: #888;
+            white-space: nowrap;
         }
 
         .table-row:hover {
@@ -254,19 +279,6 @@
 
         .table-row:last-child {
             border-bottom: none;
-        }
-
-        .table-row .name {
-            font-weight: 600;
-            color: #fff;
-        }
-
-        .table-row .date {
-            color: #888;
-        }
-
-        .table-row .time {
-            color: #888;
         }
 
         .status-badge {
@@ -683,41 +695,41 @@
 
             .table-row {
                 display: flex !important;
-                flex-direction: column;
-                gap: 8px;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
                 padding: 15px;
                 border-bottom: 1px solid #222;
-                align-items: flex-start;
             }
 
-            .table-row > div {
-                display: block !important;
-                width: 100%;
+            .row-info {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                flex: 1;
+                min-width: 0;
             }
 
-            .table-row .name {
+            .row-info .name {
                 font-size: 16px;
                 font-weight: 700;
             }
 
-            .table-row .date,
-            .table-row .time {
+            .row-info .date {
                 font-size: 13px;
                 color: #888;
             }
 
             .actions {
                 display: flex !important;
-                gap: 10px;
-                flex-wrap: wrap;
-                margin-top: 8px;
-                width: 100%;
+                gap: 6px;
+                flex-shrink: 0;
             }
 
             .action-btn {
-                width: 44px;
-                height: 44px;
-                font-size: 18px;
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
                 display: flex !important;
                 align-items: center;
                 justify-content: center;
@@ -819,10 +831,11 @@
             </div>
             <div class="reservations-table">
                 <div class="table-header">
-                    <div>Cliente</div>
-                    <div>Fecha</div>
-                    <div>Horario</div>
-                    <div>Estado</div>
+                    <div class="header-info">
+                        <div>Cliente</div>
+                        <div>Fecha</div>
+                        <div>Estado</div>
+                    </div>
                     <div>Acciones</div>
                 </div>
                 <div id="reservationsList"></div>
@@ -1018,10 +1031,11 @@
 
             list.innerHTML = filtered.map(r => `
                 <div class="table-row">
-                    <div class="name">${r.name} ${r.apellido || ''}</div>
-                    <div class="date">${r.date}</div>
-                    <div class="time">${r.time}</div>
-                    <div><span class="status-badge status-${r.status}">${r.status}</span></div>
+                    <div class="row-info">
+                        <div class="name">${r.name} ${r.apellido || ''}</div>
+                        <div class="date">${r.date} - ${r.time}</div>
+                        <div><span class="status-badge status-${r.status}">${r.status}</span></div>
+                    </div>
                     <div class="actions">
                         ${r.status === "pendiente" ? `
                             <button class="action-btn btn-confirm" onclick="updateStatus(${r.id}, 'confirmada')" title="Aceptar">✓</button>
