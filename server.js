@@ -6,6 +6,23 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, "reservations.json");
 
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || "";
+const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || "";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const BARBER_PHONE = "5493718669138";
+
+const HORARIOS = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00"];
+
+const conversations = {};
+
+function getConversation(phone) {
+    if (!conversations[phone] || Date.now() - conversations[phone].lastActivity > 30 * 60 * 1000) {
+        conversations[phone] = { messages: [], step: "greeting", data: {}, lastActivity: Date.now() };
+    }
+    conversations[phone].lastActivity = Date.now();
+    return conversations[phone];
+}
+
 app.use(express.json());
 
 app.use(function(req, res, next) {
@@ -85,7 +102,199 @@ app.delete("/api/reservations/:id", (req, res) => {
     res.json({ success: true });
 });
 
+app.get("/api/available-times/:date", (req, res) => {
+    const reservations = readData();
+    const date = req.params.date;
+    const reserved = reservations
+        .filter(r => r.date === date && r.status !== "cancelada")
+        .map(r => r.time);
+    const available = HORARIOS.filter(h => !reserved.includes(h));
+    res.json(available);
+});
+
+app.get("/webhook", (req, res) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    if (mode === "subscribe" && token === "faw_verify_2024") {
+        res.status(200).send(challenge);
+    } else {
+        res.sendStatus(403);
+    }
+});
+
+app.post("/webhook", async (req, res) => {
+    res.sendStatus(200);
+    try {
+        const body = req.body;
+        if (body.object !== "whatsapp_business_account") return;
+        const entry = body.entry && body.entry[0];
+        const changes = entry && entry.changes && entry.changes[0];
+        if (!changes || changes.field !== "messages") return;
+        const value = changes.value;
+        const messages = value.messages;
+        if (!messages || messages.length === 0) return;
+        const msg = messages[0];
+        if (msg.type !== "text") return;
+        const phone = msg.from;
+        const text = msg.text.body.trim();
+        await handleWhatsAppMessage(phone, text);
+    } catch (e) {
+        console.error("Webhook error:", e);
+    }
+});
+
+async function handleWhatsAppMessage(phone, text) {
+    const conv = getConversation(phone);
+    const lower = text.toLowerCase();
+
+    if (lower === "cancelar" || lower === "reset") {
+        conv.step = "greeting";
+        conv.data = {};
+        await sendWhatsApp(phone, "Conversación reiniciada. ¿En qué te puedo ayudar?");
+        return;
+    }
+
+    if (conv.step === "greeting") {
+        conv.step = "ask_name";
+        await sendWhatsApp(phone, "Hola! Bienvenido a Fade Away Barbershop. Soy el asistente virtual.\n\n¿Cuál es tu nombre?");
+    } else if (conv.step === "ask_name") {
+        conv.data.name = text;
+        conv.step = "ask_apellido";
+        await sendWhatsApp(phone, `Perfecto ${text}. ¿Cuál es tu apellido?`);
+    } else if (conv.step === "ask_apellido") {
+        conv.data.apellido = text;
+        conv.step = "ask_date";
+        await sendWhatsApp(phone, "¿Para qué día querés reservar? (podés escribir la fecha como 25/08 o 'hoy', 'mañana')");
+    } else if (conv.step === "ask_date") {
+        const date = parseDate(lower);
+        if (!date) {
+            await sendWhatsApp(phone, "No entendí la fecha. Escribila como 25/08, o decime 'hoy' o 'mañana'.");
+            return;
+        }
+        const dayOfWeek = new Date(date + "T12:00:00").getDay();
+        if (dayOfWeek === 0) {
+            await sendWhatsApp(phone, "Los domingos estamos cerrados. ¿Qué otro día te viene bien?");
+            return;
+        }
+        conv.data.date = date;
+        const reserved = getReservedTimes(date);
+        const available = HORARIOS.filter(h => !reserved.includes(h));
+        if (available.length === 0) {
+            await sendWhatsApp(phone, `El día ${date} no hay horarios disponibles. ¿Qué otro día querés probar?`);
+            return;
+        }
+        conv.step = "ask_time";
+        conv.data.availableTimes = available;
+        const horariosMsg = available.map(h => `• ${h}`).join("\n");
+        await sendWhatsApp(phone, `El día ${date} tenemos estos horarios disponibles:\n\n${horariosMsg}\n\n¿Cuál te sirve?`);
+    } else if (conv.step === "ask_time") {
+        const selectedTime = conv.data.availableTimes.find(h => lower.includes(h));
+        if (!selectedTime) {
+            await sendWhatsApp(phone, "No entendí el horario. Escribilo como HH:MM (ej: 15:00).");
+            return;
+        }
+        conv.data.time = selectedTime;
+        const reservation = createReservation(conv.data);
+        conv.step = "done";
+        await sendWhatsApp(phone, `Listo! Tu reserva quedó agendada:\n\n📅 Fecha: ${reservation.date}\n🕐 Hora: ${reservation.time}\n👤 Nombre: ${reservation.name} ${reservation.apellido}\n\nTe esperamos en Fade Away Barbershop.\nSi necesitás cancelar o cambiar algo, escribime!`);
+        await notifyBarber(reservation);
+    } else if (conv.step === "done") {
+        conv.step = "greeting";
+        conv.data = {};
+        await sendWhatsApp(phone, "¿Querés hacer otra reserva o necesitás algo más?");
+    }
+}
+
+function parseDate(text) {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    if (text.includes("hoy")) {
+        return formatDate(today);
+    }
+    if (text.includes("mañana")) {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return formatDate(tomorrow);
+    }
+    const match = text.match(/(\d{1,2})[\/\-](\d{1,2})/);
+    if (match) {
+        const day = match[1].padStart(2, "0");
+        const month = match[2].padStart(2, "0");
+        const year = today.getFullYear();
+        const dateStr = `${year}-${month}-${day}`;
+        const testDate = new Date(dateStr + "T12:00:00");
+        if (testDate < today) {
+            testDate.setFullYear(testDate.getFullYear() + 1);
+        }
+        return formatDate(testDate);
+    }
+    return null;
+}
+
+function formatDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
+function getReservedTimes(date) {
+    const reservations = readData();
+    return reservations
+        .filter(r => r.date === date && r.status !== "cancelada")
+        .map(r => r.time);
+}
+
+function createReservation(data) {
+    const reservations = readData();
+    const newReservation = {
+        id: Date.now(),
+        name: data.name,
+        apellido: data.apellido,
+        date: data.date,
+        time: data.time,
+        status: "pendiente",
+        payment: "pendiente",
+        createdAt: new Date().toISOString()
+    };
+    reservations.push(newReservation);
+    writeData(reservations);
+    return newReservation;
+}
+
+async function sendWhatsApp(to, text) {
+    if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) {
+        console.log(`[WA SIMULADO] Para: ${to} | Mensaje: ${text}`);
+        return;
+    }
+    try {
+        await fetch(`https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_ID}/messages`, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: to,
+                type: "text",
+                text: { body: text }
+            })
+        });
+        console.log(`[WA OK] Mensaje enviado a ${to}`);
+    } catch (e) {
+        console.error("[WA ERROR]", e.message);
+    }
+}
+
+async function notifyBarber(reservation) {
+    const msg = `🔔 *Nueva reserva*\n\n📅 ${reservation.date} a las ${reservation.time}\n👤 ${reservation.name} ${reservation.apellido}\n\nEntrá a admin para gestionarla.`;
+    await sendWhatsApp(BARBER_PHONE, msg);
+}
+
 app.listen(PORT, () => {
     console.log(`FAW Server corriendo en http://localhost:${PORT}`);
     console.log(`Admin: http://localhost:${PORT}/admin.html`);
+    console.log(`Webhook: ${PORT === 3000 ? "http://localhost:3000" : "https://faw-fade-away.onrender.com"}/webhook`);
 });
