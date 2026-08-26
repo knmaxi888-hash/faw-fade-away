@@ -1,23 +1,27 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
+const pino = require("pino");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, "reservations.json");
+const SESSION_DIR = path.join(__dirname, "wa-session");
 
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || "";
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID || "";
-const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
 const BARBER_PHONE = "5493718669138";
 
 const HORARIOS = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00"];
+
+let sock = null;
+let qrCode = null;
+let waConnected = false;
 
 const conversations = {};
 
 function getConversation(phone) {
     if (!conversations[phone] || Date.now() - conversations[phone].lastActivity > 30 * 60 * 1000) {
-        conversations[phone] = { messages: [], step: "greeting", data: {}, lastActivity: Date.now() };
+        conversations[phone] = { step: "greeting", data: {}, lastActivity: Date.now() };
     }
     conversations[phone].lastActivity = Date.now();
     return conversations[phone];
@@ -112,35 +116,15 @@ app.get("/api/available-times/:date", (req, res) => {
     res.json(available);
 });
 
-app.get("/webhook", (req, res) => {
-    const mode = req.query["hub.mode"];
-    const token = req.query["hub.verify_token"];
-    const challenge = req.query["hub.challenge"];
-    if (mode === "subscribe" && token === "faw_verify_2024") {
-        res.status(200).send(challenge);
-    } else {
-        res.sendStatus(403);
-    }
+app.get("/api/wa-status", (req, res) => {
+    res.json({ connected: waConnected, hasQR: !!qrCode });
 });
 
-app.post("/webhook", async (req, res) => {
-    res.sendStatus(200);
-    try {
-        const body = req.body;
-        if (body.object !== "whatsapp_business_account") return;
-        const entry = body.entry && body.entry[0];
-        const changes = entry && entry.changes && entry.changes[0];
-        if (!changes || changes.field !== "messages") return;
-        const value = changes.value;
-        const messages = value.messages;
-        if (!messages || messages.length === 0) return;
-        const msg = messages[0];
-        if (msg.type !== "text") return;
-        const phone = msg.from;
-        const text = msg.text.body.trim();
-        await handleWhatsAppMessage(phone, text);
-    } catch (e) {
-        console.error("Webhook error:", e);
+app.get("/api/wa-qr", (req, res) => {
+    if (qrCode) {
+        res.json({ qr: qrCode });
+    } else {
+        res.json({ qr: null });
     }
 });
 
@@ -264,24 +248,13 @@ function createReservation(data) {
 }
 
 async function sendWhatsApp(to, text) {
-    if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) {
-        console.log(`[WA SIMULADO] Para: ${to} | Mensaje: ${text}`);
+    if (!sock || !waConnected) {
+        console.log(`[WA NO CONECTADO] Para: ${to} | Mensaje: ${text}`);
         return;
     }
     try {
-        await fetch(`https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_ID}/messages`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                messaging_product: "whatsapp",
-                to: to,
-                type: "text",
-                text: { body: text }
-            })
-        });
+        const jid = to.includes("@") ? to : `${to}@s.whatsapp.net`;
+        await sock.sendMessage(jid, { text: text });
         console.log(`[WA OK] Mensaje enviado a ${to}`);
     } catch (e) {
         console.error("[WA ERROR]", e.message);
@@ -293,8 +266,76 @@ async function notifyBarber(reservation) {
     await sendWhatsApp(BARBER_PHONE, msg);
 }
 
+async function startWhatsApp() {
+    if (!fs.existsSync(SESSION_DIR)) {
+        fs.mkdirSync(SESSION_DIR, { recursive: true });
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
+
+    sock = makeWASocket({
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }))
+        },
+        printQRInTerminal: true,
+        logger: pino({ level: "silent" })
+    });
+
+    sock.ev.on("creds.update", saveCreds);
+
+    sock.ev.on("connection.update", (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            qrCode = qr;
+            waConnected = false;
+            console.log("[WA] QR Code generado - escaneá desde /qr");
+        }
+
+        if (connection === "close") {
+            const reason = lastDisconnect?.error?.output?.statusCode;
+            console.log(`[WA] Conexión cerrada. Razón: ${reason}`);
+
+            if (reason !== DisconnectReason.loggedOut) {
+                console.log("[WA] Reconectando...");
+                qrCode = null;
+                waConnected = false;
+                setTimeout(startWhatsApp, 3000);
+            } else {
+                console.log("[WA] Sesión cerrada. Necesitás escanear el QR de nuevo.");
+                qrCode = null;
+                waConnected = false;
+                try { fs.rmSync(SESSION_DIR, { recursive: true }); } catch(e) {}
+                setTimeout(startWhatsApp, 3000);
+            }
+        }
+
+        if (connection === "open") {
+            qrCode = null;
+            waConnected = true;
+            console.log("[WA] ¡Conectado a WhatsApp!");
+        }
+    });
+
+    sock.ev.on("messages.upsert", async ({ messages }) => {
+        const msg = messages[0];
+        if (!msg.key.fromMe && msg.message?.conversation) {
+            const phone = msg.key.remoteJid.replace("@s.whatsapp.net", "");
+            const text = msg.message.conversation.trim();
+            console.log(`[WA MSG] De: ${phone} | ${text}`);
+            await handleWhatsAppMessage(phone, text);
+        }
+    });
+}
+
+app.get("/qr", (req, res) => {
+    res.sendFile(path.join(__dirname, "qr.html"));
+});
+
 app.listen(PORT, () => {
     console.log(`FAW Server corriendo en http://localhost:${PORT}`);
     console.log(`Admin: http://localhost:${PORT}/admin.html`);
-    console.log(`Webhook: ${PORT === 3000 ? "http://localhost:3000" : "https://faw-fade-away.onrender.com"}/webhook`);
+    console.log(`QR Code: http://localhost:${PORT}/qr`);
+    startWhatsApp();
 });
