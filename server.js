@@ -1,12 +1,13 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const { MongoClient } = require("mongodb");
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } = require("@whiskeysockets/baileys");
 const pino = require("pino");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, "reservations.json");
+const MONGODB_URI = process.env.MONGODB_URI || "";
 const SESSION_DIR = path.join(__dirname, "wa-session");
 
 const BARBER_PHONE = "5493718669138";
@@ -16,6 +17,8 @@ const HORARIOS = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30
 let sock = null;
 let qrCode = null;
 let waConnected = false;
+let db = null;
+let reservations = null;
 
 const conversations = {};
 
@@ -39,38 +42,45 @@ app.use(function(req, res, next) {
 
 app.use(express.static(__dirname));
 
-function readData() {
+async function connectDB() {
+    if (!MONGODB_URI) {
+        console.log("[DB] No MONGODB_URI configurada, usando JSON local");
+        return;
+    }
     try {
-        if (!fs.existsSync(DATA_FILE)) {
-            fs.writeFileSync(DATA_FILE, "[]");
-            return [];
-        }
-        const data = fs.readFileSync(DATA_FILE, "utf8");
-        return JSON.parse(data);
+        const client = new MongoClient(MONGODB_URI);
+        await client.connect();
+        db = client.db("faw");
+        reservations = db.collection("reservations");
+        await reservations.createIndex({ date: 1 });
+        console.log("[DB] Conectado a MongoDB");
     } catch (e) {
-        return [];
+        console.error("[DB] Error conectando:", e.message);
     }
 }
 
-function writeData(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-app.get("/api/reservations", (req, res) => {
-    res.json(readData());
+app.get("/api/reservations", async (req, res) => {
+    if (reservations) {
+        const data = await reservations.find({}).sort({ createdAt: -1 }).toArray();
+        res.json(data);
+    } else {
+        res.json([]);
+    }
 });
 
-app.get("/api/reserved-times/:date", (req, res) => {
-    const reservations = readData();
+app.get("/api/reserved-times/:date", async (req, res) => {
     const date = req.params.date;
-    const reserved = reservations
-        .filter(r => r.date === date && r.status !== "cancelada")
-        .map(r => r.time);
-    res.json(reserved);
+    if (reservations) {
+        const reserved = await reservations
+            .find({ date: date, status: { $ne: "cancelada" } })
+            .toArray();
+        res.json(reserved.map(r => r.time));
+    } else {
+        res.json([]);
+    }
 });
 
-app.post("/api/reservations", (req, res) => {
-    const reservations = readData();
+app.post("/api/reservations", async (req, res) => {
     const newReservation = {
         id: Date.now(),
         name: req.body.name,
@@ -81,39 +91,46 @@ app.post("/api/reservations", (req, res) => {
         payment: "pendiente",
         createdAt: new Date().toISOString()
     };
-    reservations.push(newReservation);
-    writeData(reservations);
+    if (reservations) {
+        await reservations.insertOne(newReservation);
+    }
     res.json({ success: true, reservation: newReservation });
 });
 
-app.put("/api/reservations/:id", (req, res) => {
-    const reservations = readData();
-    const index = reservations.findIndex(r => r.id === parseInt(req.params.id));
-    if (index !== -1) {
-        if (req.body.status) reservations[index].status = req.body.status;
-        if (req.body.payment) reservations[index].payment = req.body.payment;
-        writeData(reservations);
+app.put("/api/reservations/:id", async (req, res) => {
+    if (reservations) {
+        const id = parseInt(req.params.id);
+        const update = {};
+        if (req.body.status) update.status = req.body.status;
+        if (req.body.payment) update.payment = req.body.payment;
+        await reservations.updateOne({ id: id }, { $set: update });
         res.json({ success: true });
     } else {
-        res.status(404).json({ error: "Not found" });
+        res.status(500).json({ error: "DB not connected" });
     }
 });
 
-app.delete("/api/reservations/:id", (req, res) => {
-    let reservations = readData();
-    reservations = reservations.filter(r => r.id !== parseInt(req.params.id));
-    writeData(reservations);
-    res.json({ success: true });
+app.delete("/api/reservations/:id", async (req, res) => {
+    if (reservations) {
+        const id = parseInt(req.params.id);
+        await reservations.deleteOne({ id: id });
+        res.json({ success: true });
+    } else {
+        res.status(500).json({ error: "DB not connected" });
+    }
 });
 
-app.get("/api/available-times/:date", (req, res) => {
-    const reservations = readData();
+app.get("/api/available-times/:date", async (req, res) => {
     const date = req.params.date;
-    const reserved = reservations
-        .filter(r => r.date === date && r.status !== "cancelada")
-        .map(r => r.time);
-    const available = HORARIOS.filter(h => !reserved.includes(h));
-    res.json(available);
+    if (reservations) {
+        const reserved = await reservations
+            .find({ date: date, status: { $ne: "cancelada" } })
+            .toArray();
+        const reservedTimes = reserved.map(r => r.time);
+        res.json(HORARIOS.filter(h => !reservedTimes.includes(h)));
+    } else {
+        res.json(HORARIOS);
+    }
 });
 
 app.get("/api/wa-status", (req, res) => {
@@ -162,7 +179,7 @@ async function handleWhatsAppMessage(phone, text) {
             return;
         }
         conv.data.date = date;
-        const reserved = getReservedTimes(date);
+        const reserved = await getReservedTimes(date);
         const available = HORARIOS.filter(h => !reserved.includes(h));
         if (available.length === 0) {
             await sendWhatsApp(phone, `El día ${date} no hay horarios disponibles. ¿Qué otro día querés probar?`);
@@ -179,7 +196,7 @@ async function handleWhatsAppMessage(phone, text) {
             return;
         }
         conv.data.time = selectedTime;
-        const reservation = createReservation(conv.data);
+        const reservation = await createReservation(conv.data);
         conv.step = "done";
         await sendWhatsApp(phone, `Listo! Tu reserva quedó agendada:\n\n📅 Fecha: ${reservation.date}\n🕐 Hora: ${reservation.time}\n👤 Nombre: ${reservation.name} ${reservation.apellido}\n\nTe esperamos en Fade Away Barbershop.\nSi necesitás cancelar o cambiar algo, escribime!`);
         await notifyBarber(reservation);
@@ -223,15 +240,17 @@ function formatDate(d) {
     return `${y}-${m}-${day}`;
 }
 
-function getReservedTimes(date) {
-    const reservations = readData();
-    return reservations
-        .filter(r => r.date === date && r.status !== "cancelada")
-        .map(r => r.time);
+async function getReservedTimes(date) {
+    if (reservations) {
+        const reserved = await reservations
+            .find({ date: date, status: { $ne: "cancelada" } })
+            .toArray();
+        return reserved.map(r => r.time);
+    }
+    return [];
 }
 
-function createReservation(data) {
-    const reservations = readData();
+async function createReservation(data) {
     const newReservation = {
         id: Date.now(),
         name: data.name,
@@ -242,8 +261,9 @@ function createReservation(data) {
         payment: "pendiente",
         createdAt: new Date().toISOString()
     };
-    reservations.push(newReservation);
-    writeData(reservations);
+    if (reservations) {
+        await reservations.insertOne(newReservation);
+    }
     return newReservation;
 }
 
@@ -333,9 +353,10 @@ app.get("/qr", (req, res) => {
     res.sendFile(path.join(__dirname, "qr.html"));
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`FAW Server corriendo en http://localhost:${PORT}`);
     console.log(`Admin: http://localhost:${PORT}/admin.html`);
     console.log(`QR Code: http://localhost:${PORT}/qr`);
+    await connectDB();
     startWhatsApp();
 });
