@@ -481,7 +481,7 @@
 
                 const encodedMessage = encodeURIComponent(message);
                 const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
-                window.open(url, "_blank");
+                window.location.href = url;
             }).catch(function() {
                 alert("No se pudo conectar con el servidor. Intente de nuevo.");
             });
