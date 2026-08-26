@@ -1087,5 +1087,446 @@
 
         contactObserver.observe(contactSection);
     </script>
+
+    <!-- Chat Widget -->
+    <style>
+        .chat-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #b8860b, #daa520);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(218,165,32,0.4);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        .chat-fab:hover { transform: scale(1.1); }
+        .chat-fab svg { width: 30px; height: 30px; fill: #fff; }
+        .chat-fab.hidden { display: none; }
+
+        .chat-window {
+            position: fixed;
+            bottom: 96px;
+            right: 24px;
+            width: 360px;
+            max-width: calc(100vw - 48px);
+            height: 500px;
+            max-height: calc(100vh - 140px);
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            z-index: 9998;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+        }
+        .chat-window.hidden { display: none; }
+
+        .chat-header {
+            background: linear-gradient(135deg, #1a1a1a, #222);
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid #333;
+        }
+        .chat-header-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #b8860b, #daa520);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #fff;
+            font-weight: bold;
+        }
+        .chat-header-info h3 { color: #fff; font-size: 15px; margin: 0; }
+        .chat-header-info span { color: #888; font-size: 12px; }
+        .chat-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-msg {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+        .chat-msg.bot {
+            background: #1e1e1e;
+            color: #e0e0e0;
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+        }
+        .chat-msg.user {
+            background: linear-gradient(135deg, #b8860b, #a07008);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+            align-self: flex-end;
+        }
+        .chat-msg.system {
+            background: #0d3320;
+            color: #4ade80;
+            text-align: center;
+            align-self: center;
+            font-size: 13px;
+        }
+        .chat-msg.error {
+            background: #3d1414;
+            color: #f87171;
+            text-align: center;
+            align-self: center;
+        }
+
+        .chat-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 0 16px 10px;
+        }
+        .chat-option-btn {
+            background: #1e1e1e;
+            color: #daa520;
+            border: 1px solid #444;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chat-option-btn:hover {
+            background: #daa520;
+            color: #000;
+            border-color: #daa520;
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: 12px;
+            gap: 8px;
+            border-top: 1px solid #333;
+            background: #161616;
+        }
+        .chat-input {
+            flex: 1;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 24px;
+            padding: 10px 16px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+        .chat-input::placeholder { color: #666; }
+        .chat-input:focus { border-color: #daa520; }
+        .chat-send {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #b8860b, #daa520);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .chat-send svg { width: 18px; height: 18px; fill: #fff; }
+        .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        @media (max-width: 420px) {
+            .chat-window {
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                height: 100%;
+                max-height: 100%;
+                border-radius: 0;
+            }
+            .chat-fab { bottom: 16px; right: 16px; }
+        }
+    </style>
+
+    <button class="chat-fab" id="chatFab" title="Soporte virtual">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/><path d="M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg>
+    </button>
+
+    <div class="chat-window hidden" id="chatWindow">
+        <div class="chat-header">
+            <div class="chat-header-avatar">FA</div>
+            <div class="chat-header-info">
+                <h3>Fade Away</h3>
+                <span>Asistente virtual</span>
+            </div>
+            <button class="chat-close" id="chatClose">&times;</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-options" id="chatOptions"></div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Escribí tu respuesta..." />
+            <button class="chat-send" id="chatSend">
+                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var API = "https://faw-fade-away.onrender.com";
+        var fab = document.getElementById("chatFab");
+        var win = document.getElementById("chatWindow");
+        var msgs = document.getElementById("chatMessages");
+        var opts = document.getElementById("chatOptions");
+        var inp = document.getElementById("chatInput");
+        var sendBtn = document.getElementById("chatSend");
+        var closeBtn = document.getElementById("chatClose");
+
+        var state = "idle";
+        var data = {};
+        var availableTimes = [];
+
+        var HORARIOS = ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00"];
+
+        function addMsg(text, type) {
+            var div = document.createElement("div");
+            div.className = "chat-msg " + type;
+            div.textContent = text;
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        function clearOpts() { opts.innerHTML = ""; }
+
+        function showOpts(list, callback) {
+            clearOpts();
+            list.forEach(function(item) {
+                var btn = document.createElement("button");
+                btn.className = "chat-option-btn";
+                btn.textContent = item;
+                btn.addEventListener("click", function() {
+                    clearOpts();
+                    callback(item);
+                });
+                opts.appendChild(btn);
+            });
+        }
+
+        function showInput(show) {
+            inp.style.display = show ? "block" : "none";
+            sendBtn.style.display = show ? "flex" : "none";
+            if (show) inp.focus();
+        }
+
+        function parseDate(text) {
+            var today = new Date();
+            today.setHours(12, 0, 0, 0);
+            var lower = text.toLowerCase().trim();
+            if (lower === "hoy" || lower === "today") return fmt(today);
+            if (lower === "mañana" || lower === "manana" || lower === "tomorrow") {
+                var t = new Date(today); t.setDate(t.getDate() + 1); return fmt(t);
+            }
+            var m = lower.match(/(\d{1,2})[\/\-](\d{1,2})/);
+            if (m) {
+                var day = m[1].padStart(2, "0");
+                var month = m[2].padStart(2, "0");
+                var year = today.getFullYear();
+                var d = new Date(year + "-" + month + "-" + day + "T12:00:00");
+                if (d < today) d.setFullYear(d.getFullYear() + 1);
+                return fmt(d);
+            }
+            return null;
+        }
+
+        function fmt(d) {
+            var y = d.getFullYear();
+            var m = String(d.getMonth() + 1).padStart(2, "0");
+            var day = String(d.getDate()).padStart(2, "0");
+            return y + "-" + m + "-" + day;
+        }
+
+        function fmtDisplay(dateStr) {
+            var parts = dateStr.split("-");
+            return parts[2] + "/" + parts[1] + "/" + parts[0];
+        }
+
+        function start() {
+            state = "greeting";
+            showInput(false);
+            clearOpts();
+            addMsg("Hola! Soy el asistente de Fade Away Barbershop. ¿Querés reservar un turno?", "bot");
+            showOpts(["Sí, quiero reservar", "No, gracias"], function(ans) {
+                if (ans === "Sí, quiero reservar") {
+                    addMsg("¡Perfecto!", "user");
+                    askName();
+                } else {
+                    addMsg("Ok, si necesitás algo escribime!", "bot");
+                    setTimeout(function() { closeChat(); }, 2000);
+                }
+            });
+        }
+
+        function askName() {
+            state = "ask_name";
+            addMsg("¿Cuál es tu nombre?", "bot");
+            showInput(true);
+        }
+
+        function askApellido() {
+            state = "ask_apellido";
+            addMsg("¿Cuál es tu apellido?", "bot");
+            showInput(true);
+        }
+
+        function askDate() {
+            state = "ask_date";
+            addMsg("¿Para qué día querés reservar? (escribí 'hoy', 'mañana' o una fecha como 25/08)", "bot");
+            showInput(true);
+        }
+
+        async function askTime(dateStr) {
+            state = "ask_time";
+            try {
+                var res = await fetch(API + "/api/available-times/" + dateStr);
+                availableTimes = await res.json();
+            } catch(e) { availableTimes = HORARIOS; }
+
+            if (availableTimes.length === 0) {
+                addMsg("El día " + fmtDisplay(dateStr) + " no hay horarios disponibles. ¿Qué otro día querés probar?", "bot");
+                state = "ask_date";
+                return;
+            }
+            addMsg("El día " + fmtDisplay(dateStr) + " tenemos disponibles:", "bot");
+            showOpts(availableTimes, function(time) {
+                addMsg(time, "user");
+                data.time = time;
+                confirmRes();
+            });
+        }
+
+        async function confirmRes() {
+            state = "confirm";
+            var txt = "Revisá tu reserva:\n\n" +
+                "👤 " + data.name + " " + data.apellido + "\n" +
+                "📅 " + fmtDisplay(data.date) + "\n" +
+                "🕐 " + data.time;
+            addMsg(txt, "bot");
+            showOpts(["Confirmar", "Cancelar"], function(ans) {
+                if (ans === "Confirmar") {
+                    createReservation();
+                } else {
+                    addMsg("Reserva cancelada.", "error");
+                    setTimeout(closeChat, 1500);
+                }
+            });
+        }
+
+        async function createReservation() {
+            state = "done";
+            addMsg("Creando reserva...", "bot");
+            try {
+                var res = await fetch(API + "/api/reservations", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+                var result = await res.json();
+                clearOpts();
+                showInput(false);
+                addMsg("¡Reserva confirmada!\n\n📅 " + fmtDisplay(data.date) + "\n🕐 " + data.time + "\n👤 " + data.name + " " + data.apellido + "\n\nTe esperamos en Fade Away Barbershop!", "system");
+                setTimeout(closeChat, 4000);
+            } catch(e) {
+                addMsg("Hubo un error. Intentá de nuevo.", "error");
+                setTimeout(closeChat, 2000);
+            }
+        }
+
+        function closeChat() {
+            win.classList.add("hidden");
+            fab.classList.remove("hidden");
+            msgs.innerHTML = "";
+            clearOpts();
+            state = "idle";
+            data = {};
+            availableTimes = [];
+        }
+
+        fab.addEventListener("click", function() {
+            fab.classList.add("hidden");
+            win.classList.remove("hidden");
+            start();
+        });
+
+        closeBtn.addEventListener("click", closeChat);
+
+        sendBtn.addEventListener("click", function() { handleInput(); });
+        inp.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") handleInput();
+        });
+
+        function handleInput() {
+            var val = inp.value.trim();
+            if (!val) return;
+            inp.value = "";
+
+            if (val.toLowerCase() === "cancelar") {
+                addMsg("cancelar", "user");
+                closeChat();
+                return;
+            }
+
+            addMsg(val, "user");
+
+            if (state === "ask_name") {
+                data.name = val;
+                data.status = "pendiente";
+                data.payment = "pendiente";
+                askApellido();
+            } else if (state === "ask_apellido") {
+                data.apellido = val;
+                askDate();
+            } else if (state === "ask_date") {
+                var dateStr = parseDate(val);
+                if (!dateStr) {
+                    addMsg("No entendí la fecha. Escribí 'hoy', 'mañana' o una fecha como 25/08.", "error");
+                    return;
+                }
+                var dow = new Date(dateStr + "T12:00:00").getDay();
+                if (dow === 0) {
+                    addMsg("Los domingos estamos cerrados. ¿Qué otro día?", "error");
+                    return;
+                }
+                data.date = dateStr;
+                askTime(dateStr);
+            }
+        }
+    })();
+    </script>
 </body>
 </html>
