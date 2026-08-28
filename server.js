@@ -5,8 +5,8 @@ const { MongoClient } = require("mongodb");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || "";
-
-const BARBER_PHONE = "5493718669138";
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || "";
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 
 const HORARIOS = ["09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"];
 
@@ -40,6 +40,123 @@ async function connectDB() {
     } catch (e) {
         console.error("[DB] Error conectando:", e.message);
     }
+}
+
+async function sendTelegram(text) {
+    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
+    try {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text: text,
+                parse_mode: "Markdown"
+            })
+        });
+    } catch (e) {
+        console.error("[TG ERROR]", e.message);
+    }
+}
+
+async function notifyNewReservation(r) {
+    const msg = `🔔 *Nueva reserva*\n\n👤 ${r.name} ${r.apellido}\n📅 ${displayDate(r.date)} a las ${r.time}\n\nEstado: pendiente`;
+    await sendTelegram(msg);
+}
+
+function displayDate(dateStr) {
+    if (!dateStr) return "";
+    if (dateStr.includes("-")) {
+        const parts = dateStr.split("-");
+        return parts[2] + "/" + parts[1] + "/" + parts[0];
+    }
+    return dateStr;
+}
+
+function getArgentinaDate() {
+    const now = new Date();
+    const offset = -3;
+    const local = new Date(now.getTime() + offset * 60 * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000);
+    const y = local.getFullYear();
+    const m = String(local.getMonth() + 1).padStart(2, "0");
+    const d = String(local.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+async function dailyReport() {
+    if (!reservations) return;
+    const today = getArgentinaDate();
+    const todayRes = await reservations.find({ date: today }).toArray();
+    const pending = todayRes.filter(r => r.status === "pendiente");
+    const confirmed = todayRes.filter(r => r.status === "confirmada");
+
+    const horarios = todayRes.map(r => `${r.time} - ${r.name} ${r.apellido} [${r.status}]`).join("\n") || "Sin reservas hoy.";
+
+    const msg = `📊 *Reporte diario - ${displayDate(today)}*\n\nTotal: ${todayRes.length}\nPendientes: ${pending.length}\nConfirmadas: ${confirmed.length}\n\n🕐 *Horarios:*\n${horarios}`;
+
+    await sendTelegram(msg);
+}
+
+async function weeklyCleanup() {
+    if (!reservations) return;
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const cutoff = weekAgo.toISOString();
+
+    const oldRes = await reservations.find({ createdAt: { $lt: cutoff } }).toArray();
+
+    if (oldRes.length > 0) {
+        const horarios = oldRes.map(r => `${displayDate(r.date)} ${r.time} - ${r.name} ${r.apellido} [${r.status}]`).join("\n");
+
+        const total = oldRes.length;
+        const completed = oldRes.filter(r => r.status === "completada").length;
+        const cancelled = oldRes.filter(r => r.status === "cancelada").length;
+
+        const msg = `📋 *Reporte semanal*\n\n${total} reservas en la última semana\n✅ Completadas: ${completed}\n❌ Canceladas: ${cancelled}\n\n*Detalle:*\n${horarios}`;
+
+        await sendTelegram(msg);
+
+        await reservations.deleteMany({ createdAt: { $lt: cutoff } });
+        console.log(`[CLEANUP] ${oldRes.length} reservas antiguas eliminadas`);
+    } else {
+        await sendTelegram("📋 *Reporte semanal*\n\nSin reservas en la última semana.");
+    }
+}
+
+function scheduleJobs() {
+    function getNextHourly() {
+        const now = new Date();
+        const target = new Date(now);
+        target.setHours(target.getHours() + 1, 0, 0, 0);
+        return target.getTime() - now.getTime();
+    }
+
+    function checkDailyReport() {
+        const now = new Date();
+        const offset = -3;
+        const art = new Date(now.getTime() + offset * 60 * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000);
+        return art.getHours() === 23 && art.getMinutes() === 0;
+    }
+
+    function checkWeeklyCleanup() {
+        const now = new Date();
+        const offset = -3;
+        const art = new Date(now.getTime() + offset * 60 * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000);
+        return art.getDay() === 1 && art.getHours() === 0 && art.getMinutes() === 0;
+    }
+
+    setInterval(async () => {
+        if (checkDailyReport()) {
+            console.log("[CRON] Reporte diario");
+            await dailyReport();
+        }
+        if (checkWeeklyCleanup()) {
+            console.log("[CRON] Limpieza semanal");
+            await weeklyCleanup();
+        }
+    }, 60000);
+
+    console.log("[CRON] Jobs programados (chequeo cada minuto)");
 }
 
 app.get("/api/reservations", async (req, res) => {
@@ -77,6 +194,7 @@ app.post("/api/reservations", async (req, res) => {
     if (reservations) {
         await reservations.insertOne(newReservation);
     }
+    await notifyNewReservation(newReservation);
     res.json({ success: true, reservation: newReservation });
 });
 
@@ -124,4 +242,5 @@ app.listen(PORT, async () => {
     console.log(`FAW Server corriendo en http://localhost:${PORT}`);
     console.log(`Admin: http://localhost:${PORT}/admin.html`);
     await connectDB();
+    scheduleJobs();
 });
